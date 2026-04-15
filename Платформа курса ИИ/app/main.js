@@ -2,6 +2,17 @@ const DATA_URL = './data/course-data.json';
 const STORAGE_KEY = 'ai-course-tests-v2';
 const MOBILE_BREAKPOINT = 1100;
 const AVAILABLE_MODULE_IDS = new Set(['module-1']);
+const DISPLAY_MODULES = [
+  { number: 1, id: 'module-1', title: 'Ландшафт ИИ для бизнеса' },
+  { number: 2, id: 'module-2', title: 'Выбор ИИ-модели под задачу' },
+  { number: 3, id: 'module-3', title: 'Промптинг как операционная компетенция' },
+  { number: 4, id: 'module-4', title: 'ИИ в ключевых бизнес-функциях' },
+  { number: 5, id: 'module-5', title: 'No-code автоматизация с ИИ' },
+  { number: 6, id: 'module-6', title: 'ИИ-агенты: где уместны, где избыточны' },
+  { number: 7, id: 'module-7', title: 'Vibe coding и AI-прототипирование' },
+  { number: 8, id: 'module-8', title: 'Стратегия внедрения ИИ' },
+  { number: 9, id: 'module-9', title: 'Право, этика и governance ИИ' }
+];
 
 const sidebarEl = document.getElementById('sidebar');
 const mainEl = document.getElementById('main');
@@ -314,6 +325,24 @@ const getModules = () => state.data?.modules || [];
 const isModuleAvailable = (moduleOrId) =>
   AVAILABLE_MODULE_IDS.has(typeof moduleOrId === 'string' ? moduleOrId : moduleOrId?.id);
 const getAvailableModules = () => getModules().filter((module) => isModuleAvailable(module));
+const getDisplayModules = () =>
+  DISPLAY_MODULES.map((moduleMeta) => {
+    const liveModule = getModules().find((module) => module.id === moduleMeta.id);
+    return liveModule
+      ? liveModule
+      : {
+          ...moduleMeta,
+          testTitle: moduleMeta.title,
+          sourceFile: '',
+          totalQuestions: 0,
+          estimatedTime: '',
+          passThreshold: '',
+          passThresholdValue: 0,
+          attemptsAllowed: '',
+          questions: [],
+          isPlaceholder: true
+        };
+  });
 
 const getModuleById = (moduleId) => getModules().find((module) => module.id === moduleId) || null;
 
@@ -433,12 +462,13 @@ const renderSidebar = () => {
   }
 
   const stats = getOverallStats();
-  const moduleButtons = getModules()
+  const moduleButtons = getDisplayModules()
     .map((module) => {
       const active = state.view === 'module' && state.selectedModuleId === module.id ? 'active' : '';
-      const result = getModuleResult(module);
+      const result = module.isPlaceholder ? null : getModuleResult(module);
       const available = isModuleAvailable(module);
-      const statusClass = !available ? 'locked' : result.submitted ? (result.passed ? 'completed' : 'attention') : '';
+      const statusClass =
+        !available ? 'locked' : result?.submitted ? (result.passed ? 'completed' : 'attention') : '';
 
       return `
         <button class="nav-item ${active} ${statusClass}" data-nav="module" data-module-id="${module.id}" ${available ? '' : 'disabled'}>
@@ -483,6 +513,7 @@ const renderHub = () => {
       <div class="subline">[Static LMS] отдельный портал проверки знаний для живого потока</div>
 
       <div class="panel">
+        <span class="badge">Модулей в хабе: ${DISPLAY_MODULES.length}</span>
         <span class="badge">Открыто сейчас: ${stats.total}</span>
         <span class="badge orange">Завершено: ${stats.finished}</span>
         <span class="badge cyan">Сдано: ${stats.passed}</span>
@@ -494,10 +525,13 @@ const renderHub = () => {
       </div>
 
       <div class="module-grid">
-        ${getModules()
+        ${getDisplayModules()
           .map((module) => {
-            const result = getModuleResult(module);
+            const result = module.isPlaceholder ? null : getModuleResult(module);
             const available = isModuleAvailable(module);
+            const questionCount = module.questions?.length || 0;
+            const timeLabel = module.estimatedTime || (module.isPlaceholder ? 'Пока без теста' : '—');
+            const passLabel = module.passThreshold || (module.isPlaceholder ? 'Скоро' : '—');
 
             return `
               <article class="module-card ${available ? '' : 'locked'}">
@@ -507,13 +541,13 @@ const renderHub = () => {
                 </div>
                 <h3 class="module-title">${escapeHtml(module.title)}</h3>
                 <div class="module-meta">
-                  <span class="badge">${module.questions.length} вопросов</span>
-                  <span class="badge orange">${escapeHtml(module.estimatedTime || '—')}</span>
-                  <span class="badge cyan">${escapeHtml(module.passThreshold || '—')}</span>
+                  <span class="badge">${questionCount > 0 ? `${questionCount} вопросов` : 'Тест готовится'}</span>
+                  <span class="badge orange">${escapeHtml(timeLabel)}</span>
+                  <span class="badge cyan">${escapeHtml(passLabel)}</span>
                 </div>
                 <div class="lesson-actions" style="margin-top:16px; margin-bottom:0;">
                   <button class="btn primary" data-nav="module" data-module-id="${module.id}" ${available ? '' : 'disabled'}>
-                    ${available ? (result.submitted ? 'Открыть результат' : 'Открыть тест') : 'Пока закрыт'}
+                    ${available ? (result?.submitted ? 'Открыть результат' : 'Открыть тест') : 'Пока закрыт'}
                   </button>
                 </div>
               </article>
