@@ -1,6 +1,7 @@
 const DATA_URL = './data/course-data.json';
 const STORAGE_KEY = 'ai-course-tests-v2';
 const MOBILE_BREAKPOINT = 1100;
+const AVAILABLE_MODULE_IDS = new Set(['module-1']);
 
 const sidebarEl = document.getElementById('sidebar');
 const mainEl = document.getElementById('main');
@@ -310,6 +311,9 @@ const getModuleState = (moduleId) => {
 };
 
 const getModules = () => state.data?.modules || [];
+const isModuleAvailable = (moduleOrId) =>
+  AVAILABLE_MODULE_IDS.has(typeof moduleOrId === 'string' ? moduleOrId : moduleOrId?.id);
+const getAvailableModules = () => getModules().filter((module) => isModuleAvailable(module));
 
 const getModuleById = (moduleId) => getModules().find((module) => module.id === moduleId) || null;
 
@@ -384,7 +388,7 @@ const getModuleResult = (module) => {
 };
 
 const getOverallStats = () => {
-  const modules = getModules();
+  const modules = getAvailableModules();
   const finished = modules.filter((module) => getModuleResult(module).submitted).length;
   const passed = modules.filter((module) => getModuleResult(module).submitted && getModuleResult(module).passed).length;
   return { finished, passed, total: modules.length };
@@ -406,6 +410,10 @@ const formatDateTime = (value) => {
 };
 
 const moduleStatusLabel = (module) => {
+  if (!isModuleAvailable(module)) {
+    return 'Скоро';
+  }
+
   const result = getModuleResult(module);
   if (!result.submitted && result.answered === 0) {
     return 'Не начат';
@@ -429,10 +437,11 @@ const renderSidebar = () => {
     .map((module) => {
       const active = state.view === 'module' && state.selectedModuleId === module.id ? 'active' : '';
       const result = getModuleResult(module);
-      const statusClass = result.submitted ? (result.passed ? 'completed' : 'attention') : '';
+      const available = isModuleAvailable(module);
+      const statusClass = !available ? 'locked' : result.submitted ? (result.passed ? 'completed' : 'attention') : '';
 
       return `
-        <button class="nav-item ${active} ${statusClass}" data-nav="module" data-module-id="${module.id}">
+        <button class="nav-item ${active} ${statusClass}" data-nav="module" data-module-id="${module.id}" ${available ? '' : 'disabled'}>
           Модуль ${module.number}: ${escapeHtml(module.title)}
           <div class="nav-item-meta">${moduleStatusLabel(module)}</div>
         </button>
@@ -448,11 +457,11 @@ const renderSidebar = () => {
 
     <div class="stat">
       <div class="stat-panel">
-        <div class="stat-label">Тестов завершено</div>
+        <div class="stat-label">Доступных тестов завершено</div>
         <div class="stat-value">${stats.finished}/${stats.total}</div>
       </div>
       <div class="stat-panel">
-        <div class="stat-label">Тестов сдано</div>
+        <div class="stat-label">Доступных тестов сдано</div>
         <div class="stat-value">${stats.passed}/${stats.total}</div>
       </div>
     </div>
@@ -474,18 +483,24 @@ const renderHub = () => {
       <div class="subline">[Static LMS] отдельный портал проверки знаний для живого потока</div>
 
       <div class="panel">
-        <span class="badge">Модулей: ${stats.total}</span>
+        <span class="badge">Открыто сейчас: ${stats.total}</span>
         <span class="badge orange">Завершено: ${stats.finished}</span>
         <span class="badge cyan">Сдано: ${stats.passed}</span>
+      </div>
+
+      <div class="panel">
+        <strong>Сейчас доступен только модуль 1.</strong>
+        <p class="muted">Модули 2–6 временно закрыты, пока вы перепроверяете вопросы и парсер.</p>
       </div>
 
       <div class="module-grid">
         ${getModules()
           .map((module) => {
             const result = getModuleResult(module);
+            const available = isModuleAvailable(module);
 
             return `
-              <article class="module-card">
+              <article class="module-card ${available ? '' : 'locked'}">
                 <div class="module-card-top">
                   <div class="module-number">Модуль ${module.number}</div>
                   <div class="module-status">${escapeHtml(moduleStatusLabel(module))}</div>
@@ -497,8 +512,8 @@ const renderHub = () => {
                   <span class="badge cyan">${escapeHtml(module.passThreshold || '—')}</span>
                 </div>
                 <div class="lesson-actions" style="margin-top:16px; margin-bottom:0;">
-                  <button class="btn primary" data-nav="module" data-module-id="${module.id}">
-                    ${result.submitted ? 'Открыть результат' : 'Открыть тест'}
+                  <button class="btn primary" data-nav="module" data-module-id="${module.id}" ${available ? '' : 'disabled'}>
+                    ${available ? (result.submitted ? 'Открыть результат' : 'Открыть тест') : 'Пока закрыт'}
                   </button>
                 </div>
               </article>
@@ -878,17 +893,19 @@ const render = () => {
 const ensureValidSelection = () => {
   const modules = getModules();
 
-  if (!modules.length) {
+  const availableModules = getAvailableModules();
+
+  if (!modules.length || !availableModules.length) {
     state.selectedModuleId = null;
     state.view = 'hub';
     return;
   }
 
-  if (!state.selectedModuleId || !getModuleById(state.selectedModuleId)) {
-    state.selectedModuleId = modules[0].id;
+  if (!state.selectedModuleId || !getModuleById(state.selectedModuleId) || !isModuleAvailable(state.selectedModuleId)) {
+    state.selectedModuleId = availableModules[0].id;
   }
 
-  if (state.view === 'module' && !getSelectedModule()) {
+  if (state.view === 'module' && (!getSelectedModule() || !isModuleAvailable(state.selectedModuleId))) {
     state.view = 'hub';
   }
 };
@@ -901,6 +918,10 @@ const selectHub = () => {
 };
 
 const selectModule = (moduleId) => {
+  if (!isModuleAvailable(moduleId)) {
+    return;
+  }
+
   state.selectedModuleId = moduleId;
   state.view = 'module';
   saveState();
@@ -922,7 +943,7 @@ const buildResultText = (module) => {
 
 const submitModuleTest = (moduleId) => {
   const module = getModuleById(moduleId);
-  if (!module) {
+  if (!module || !isModuleAvailable(module)) {
     return;
   }
 
@@ -934,6 +955,10 @@ const submitModuleTest = (moduleId) => {
 };
 
 const resetModuleTest = (moduleId) => {
+  if (!isModuleAvailable(moduleId)) {
+    return;
+  }
+
   state.tests[moduleId] = {
     answers: {},
     submitted: false,
@@ -946,7 +971,7 @@ const resetModuleTest = (moduleId) => {
 
 const copyModuleResult = async (moduleId) => {
   const module = getModuleById(moduleId);
-  if (!module) {
+  if (!module || !isModuleAvailable(module)) {
     return;
   }
 
