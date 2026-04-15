@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Межмодульные тесты курса ИИ</title>
+    <link rel="stylesheet" href="./app/styles.css" />
+  </head>
+  <body>
+    <div class="grid-overlay" aria-hidden="true"></div>
+    <button class="mobile-nav-toggle" id="mobile-nav-toggle" type="button" aria-label="Открыть навигацию">
+      Меню
+    </button>
+    <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar"></aside>
+      <main class="main" id="main"></main>
+    </div>
+    <script type="module" src="./app/main.js"></script>
+  </body>
+</html>
