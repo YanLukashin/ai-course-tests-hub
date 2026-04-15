@@ -284,6 +284,25 @@ const parseTopMeta = (markdown, questionCount) => {
   return result;
 };
 
+const parseMatchingThreshold = (text, totalPairs) => {
+  const raw = cleanText(text);
+  if (!raw) {
+    return totalPairs;
+  }
+
+  const exactMatch = raw.match(/минимум\s+(\d+)\s+из\s+(\d+)/i);
+  if (exactMatch) {
+    return Number.parseInt(exactMatch[1], 10) || totalPairs;
+  }
+
+  const fallbackMatch = raw.match(/минимум\s+(\d+)/i);
+  if (fallbackMatch) {
+    return Number.parseInt(fallbackMatch[1], 10) || totalPairs;
+  }
+
+  return totalPairs;
+};
+
 const parsePassThresholdValue = (text, totalQuestions) => {
   const exactMatch = String(text || '').match(/(\d+)\s+из\s+\d+/i);
   if (exactMatch) {
@@ -669,7 +688,13 @@ const buildGrading = (question) => {
 
   if (interaction === 'matching_text') {
     const expectedMap = parseExpectedMap(correctAnswer);
-    return Object.keys(expectedMap).length > 0 ? { mode: 'matching_text', expectedMap } : { mode: 'manual' };
+    return Object.keys(expectedMap).length > 0
+      ? {
+          mode: 'matching_text',
+          expectedMap,
+          minCorrect: parseMatchingThreshold(question.scoring, Object.keys(expectedMap).length)
+        }
+      : { mode: 'manual' };
   }
 
   if (interaction === 'ordering' && question.ordering) {

@@ -243,13 +243,26 @@ const parseMapToken = (value) => {
   return choiceToken || normalizeComparableText(cleaned);
 };
 
+const normalizeAnswerMapObject = (raw) => {
+  const entries = Object.entries(raw || {})
+    .map(([key, value]) => [parseMapToken(key), parseMapToken(value)])
+    .filter(([, value]) => value);
+
+  return Object.fromEntries(entries);
+};
+
 const parseAnswerMap = (raw) => {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return normalizeAnswerMapObject(raw);
+  }
+
   const result = {};
   const text = String(raw || '');
   const lines = text
     .split('\n')
     .flatMap((line) => line.split(';'))
-    .flatMap((line) => line.split('|'));
+    .flatMap((line) => line.split('|'))
+    .flatMap((line) => line.split(/,(?=\s*[A-Za-zА-Яа-яЁё0-9]+\s*(?:→|=>|->|=|-|:))/));
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -269,6 +282,9 @@ const parseAnswerMap = (raw) => {
 
   return result;
 };
+
+const countMapMatches = (expected, actual) =>
+  Object.keys(expected).reduce((total, key) => (String(expected[key]) === String(actual[key]) ? total + 1 : total), 0);
 
 const mapsEqual = (left, right) => {
   const leftKeys = Object.keys(left).sort();
@@ -317,8 +333,12 @@ const gradeQuestion = (question, rawAnswer) => {
 
   if (grading.mode === 'matching_text') {
     const actual = parseAnswerMap(rawAnswer || '');
-    const correct = mapsEqual(grading.expectedMap || {}, actual);
-    return { auto: true, score: correct ? 1 : 0, correct };
+    const expected = grading.expectedMap || {};
+    const matchedPairs = countMapMatches(expected, actual);
+    const totalPairs = Object.keys(expected).length;
+    const requiredPairs = Number(grading.minCorrect || totalPairs || 0);
+    const correct = matchedPairs >= requiredPairs && totalPairs > 0;
+    return { auto: true, score: correct ? 1 : 0, correct, matchedPairs, totalPairs, requiredPairs };
   }
 
   if (grading.mode === 'ordering') {
@@ -497,6 +517,8 @@ const matchingHint = (question) => {
   const expectedMap = question.grading?.expectedMap || {};
   const values = Object.values(expectedMap);
   const allShort = values.every((value) => String(value).length <= 2);
+  const requiredPairs = Number(question.grading?.minCorrect || Object.keys(expectedMap).length || 0);
+  const totalPairs = Object.keys(expectedMap).length;
 
   if (allShort && Object.keys(expectedMap).length > 0) {
     const sample = Object.entries(expectedMap)
@@ -504,10 +526,146 @@ const matchingHint = (question) => {
       .map(([key, value]) => `${key}-${value}`)
       .join(', ');
 
-    return `Формат ответа: ${sample}`;
+    return totalPairs && requiredPairs < totalPairs
+      ? `Нужно совпасть минимум по ${requiredPairs} из ${totalPairs} пар. Формат ответа: ${sample}`
+      : `Формат ответа: ${sample}`;
   }
 
   return 'Формат ответа: 1-..., 2-..., 3-...';
+};
+
+const parseMarkdownSections = (markdown) => {
+  const sections = {};
+  let current = '__intro__';
+  sections[current] = [];
+
+  for (const line of String(markdown || '').replace(/\r/g, '').split('\n')) {
+    const headingMatch = line.trim().match(/^###\s+(.+)$/);
+    if (headingMatch) {
+      current = headingMatch[1].trim();
+      sections[current] = [];
+      continue;
+    }
+
+    sections[current].push(line);
+  }
+
+  return Object.fromEntries(
+    Object.entries(sections)
+      .map(([key, lines]) => [key, lines.join('\n').trim()])
+      .filter(([, value]) => value)
+  );
+};
+
+const extractKeyedItems = (markdown) => {
+  const lines = String(markdown || '')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const items = [];
+
+  for (const line of lines) {
+    const cleaned = line.replace(/^[-*]\s+/, '').trim();
+    const numericMatch = cleaned.match(/^(\d+)[.)]\s+(.+)$/);
+    if (numericMatch) {
+      items.push({ key: numericMatch[1], label: numericMatch[2].trim(), kind: 'numeric' });
+      continue;
+    }
+
+    const letterMatch = cleaned.match(/^[([{\s]*([A-Za-zА-Яа-яЁё])[)\].}]?\s+(.+)$/);
+    if (letterMatch) {
+      items.push({ key: normalizeChoiceKey(letterMatch[1]), label: letterMatch[2].trim(), kind: 'choice' });
+    }
+  }
+
+  return items;
+};
+
+const getStructuredMatchingData = (question) => {
+  const sections = parseMarkdownSections(question.promptMarkdown);
+  const sectionItems = Object.values(sections)
+    .map((value) => extractKeyedItems(value))
+    .filter((items) => items.length > 0);
+
+  const leftItems =
+    sectionItems.find((items) => items.every((item) => item.kind === 'numeric')) || [];
+  const rightItems =
+    sectionItems.find((items) => items.every((item) => item.kind === 'choice')) || [];
+
+  if (leftItems.length === 0 || rightItems.length === 0) {
+    return null;
+  }
+
+  return {
+    leftItems,
+    rightItems
+  };
+};
+
+const renderMatchingInput = (question, answer, disabled) => {
+  const layout = getStructuredMatchingData(question);
+  if (!layout) {
+    return `
+      <div class="muted">${matchingHint(question)}</div>
+      <textarea class="text-area" data-question="${question.number}" data-input-type="matching" ${disabled ? 'disabled' : ''}>${escapeHtml(answer || '')}</textarea>
+    `;
+  }
+
+  const current = parseAnswerMap(answer);
+
+  return `
+    <div class="muted">${matchingHint(question)}</div>
+    <div class="matching-layout">
+      <div class="matching-reference">
+        <div class="matching-reference-title">Варианты справа</div>
+        ${layout.rightItems
+          .map(
+            (item) => `
+              <div class="matching-reference-item">
+                <span class="matching-reference-key">${escapeHtml(item.key)}</span>
+                <span>${escapeHtml(item.label)}</span>
+              </div>
+            `
+          )
+          .join('')}
+      </div>
+
+      <div class="matching-grid">
+        ${layout.leftItems
+          .map(
+            (item) => `
+              <label class="matching-row">
+                <span class="matching-left">
+                  <span class="matching-left-key">${escapeHtml(item.key)}</span>
+                  <span>${escapeHtml(item.label)}</span>
+                </span>
+                <select
+                  class="matching-select"
+                  data-question="${question.number}"
+                  data-input-type="matching-select"
+                  data-match-key="${escapeHtml(item.key)}"
+                  ${disabled ? 'disabled' : ''}
+                >
+                  <option value="">Выберите вариант</option>
+                  ${layout.rightItems
+                    .map(
+                      (option) => `
+                        <option value="${option.key}" ${String(current[item.key] || '') === option.key ? 'selected' : ''}>
+                          ${option.key}
+                        </option>
+                      `
+                    )
+                    .join('')}
+                </select>
+              </label>
+            `
+          )
+          .join('')}
+      </div>
+    </div>
+  `;
 };
 
 const renderOrderingInput = (question, answer, disabled) => {
@@ -589,10 +747,7 @@ const renderQuestionInput = (question, answer, submitted) => {
   }
 
   if (question.interaction === 'matching_text') {
-    return `
-      <div class="muted">${matchingHint(question)}</div>
-      <textarea class="text-area" data-question="${question.number}" data-input-type="matching" ${submitted ? 'disabled' : ''}>${escapeHtml(answer || '')}</textarea>
-    `;
+    return renderMatchingInput(question, answer, submitted);
   }
 
   return `<textarea class="text-area" data-question="${question.number}" data-input-type="open" ${submitted ? 'disabled' : ''}>${escapeHtml(answer || '')}</textarea>`;
@@ -607,10 +762,17 @@ const renderFeedback = (question, moduleId) => {
   const grade = gradeQuestion(question, moduleState.answers[question.number]);
   const className = grade.correct ? 'correct' : 'wrong';
   const autoLabel = grade.correct ? 'Ответ засчитан' : 'Ответ не засчитан';
+  const matchingMeta =
+    question.interaction === 'matching_text' && Number.isFinite(grade.matchedPairs)
+      ? `<div style="margin-top:8px;"><strong>Совпало пар:</strong> ${grade.matchedPairs}/${grade.totalPairs}${
+          grade.requiredPairs && grade.requiredPairs !== grade.totalPairs ? ` · минимум нужно ${grade.requiredPairs}` : ''
+        }</div>`
+      : '';
 
   return `
     <div class="feedback ${className}">
       <div><strong>${autoLabel}</strong></div>
+      ${matchingMeta}
       <div style="margin-top:8px;"><strong>Правильный ответ:</strong><br/>${markdownToHtml(question.correctAnswer || '—')}</div>
       <div style="margin-top:8px;"><strong>Пояснение:</strong><br/>${markdownToHtml(question.explanation || '—')}</div>
       <div style="margin-top:8px;"><strong>Критерий:</strong> ${escapeHtml(question.scoring || '—')}</div>
@@ -929,6 +1091,22 @@ mainEl.addEventListener('change', (event) => {
       : {};
 
     current[orderIndex] = target.value ? Number(target.value) : '';
+    moduleState.answers[question] = current;
+    saveState();
+    return;
+  }
+
+  if (target.matches('[data-input-type="matching-select"]')) {
+    const question = Number(target.dataset.question);
+    const current = parseAnswerMap(moduleState.answers[question]);
+    const matchKey = String(target.dataset.matchKey || '');
+
+    if (target.value) {
+      current[matchKey] = target.value;
+    } else {
+      delete current[matchKey];
+    }
+
     moduleState.answers[question] = current;
     saveState();
   }

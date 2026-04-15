@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-15T16:23:57.094Z",
+  "generatedAt": "2026-04-15T16:42:43.329Z",
   "siteTitle": "Межмодульное тестирование",
   "courseTitle": "ИИ для предпринимателей и специалистов",
   "modules": [
@@ -93,7 +93,8 @@
               "3": "D",
               "4": "E",
               "5": "A"
-            }
+            },
+            "minCorrect": 4
           }
         },
         {
@@ -411,7 +412,8 @@
               "В": "5",
               "Г": "2",
               "Д": "1"
-            }
+            },
+            "minCorrect": 4
           }
         },
         {
@@ -467,7 +469,8 @@
             "expectedMap": {
               "hard constraints": "1 3 5 7",
               "optimizers": "2 4 6 8"
-            }
+            },
+            "minCorrect": 6
           }
         },
         {
@@ -778,7 +781,8 @@
               "3": "C",
               "4": "D",
               "5": "E"
-            }
+            },
+            "minCorrect": 5
           }
         },
         {
@@ -819,7 +823,8 @@
               "2": "A",
               "3": "C",
               "4": "D"
-            }
+            },
+            "minCorrect": 4
           }
         },
         {
@@ -936,7 +941,8 @@
               "2": "B",
               "3": "C",
               "4": "D"
-            }
+            },
+            "minCorrect": 4
           }
         },
         {
@@ -958,7 +964,8 @@
               "1": "A",
               "2": "B",
               "3": "C"
-            }
+            },
+            "minCorrect": 3
           }
         }
       ]
@@ -1027,7 +1034,8 @@
             "mode": "matching_text",
             "expectedMap": {
               "c time": "to hire"
-            }
+            },
+            "minCorrect": 1
           }
         },
         {
@@ -1086,7 +1094,8 @@
               "c human": "decide",
               "3 short": "list кандидатов",
               "b human": "approve"
-            }
+            },
+            "minCorrect": 5
           }
         },
         {
@@ -1141,7 +1150,8 @@
             "mode": "matching_text",
             "expectedMap": {
               "semi": "auto pipeline"
-            }
+            },
+            "minCorrect": 1
           }
         },
         {
@@ -1634,7 +1644,8 @@
             "mode": "matching_text",
             "expectedMap": {
               "5 supervised multi": "step workflow"
-            }
+            },
+            "minCorrect": 1
           }
         },
         {
@@ -1694,7 +1705,8 @@
             "mode": "matching_text",
             "expectedMap": {
               "высокая цена ошибки без human": "in the loop"
-            }
+            },
+            "minCorrect": 1
           }
         },
         {
