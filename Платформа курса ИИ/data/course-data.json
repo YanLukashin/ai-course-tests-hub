@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-15T16:42:43.329Z",
+  "generatedAt": "2026-04-15T17:19:14.806Z",
   "siteTitle": "Межмодульное тестирование",
   "courseTitle": "ИИ для предпринимателей и специалистов",
   "modules": [
@@ -10,10 +10,10 @@
       "testTitle": "Модуль 1. Готовый тест (10 вопросов)",
       "sourceFile": "Модуль 1/Module-1-Test-Final.md",
       "totalQuestions": 10,
-      "estimatedTime": "",
-      "passThreshold": "",
-      "passThresholdValue": null,
-      "attemptsAllowed": "",
+      "estimatedTime": "20 минут на весь тест.",
+      "passThreshold": "60% = минимум 6 из 10",
+      "passThresholdValue": 6,
+      "attemptsAllowed": "2",
       "questions": [
         {
           "number": 1,

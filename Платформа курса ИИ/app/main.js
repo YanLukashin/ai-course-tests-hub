@@ -403,7 +403,7 @@ const getModuleResult = (module) => {
   }).length;
   const percent = module.questions.length ? Math.round((score / module.questions.length) * 100) : 0;
   const passValue = Number(module.passThresholdValue || 0);
-  const passed = passValue > 0 ? score >= passValue : false;
+  const passed = passValue > 0 ? score >= passValue : module.questions.length > 0 && score === module.questions.length;
 
   return {
     score,

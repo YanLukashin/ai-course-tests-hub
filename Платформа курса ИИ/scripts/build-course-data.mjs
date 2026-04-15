@@ -281,6 +281,35 @@ const parseTopMeta = (markdown, questionCount) => {
     result.attemptsAllowed = cleanText(fallbackAttemptsMatch[1]);
   }
 
+  const plainAll = stripMarkdown(markdown);
+  const notesPassMatch = plainAll.match(/Проходн(?:ой уровень|ой балл)\.?\s*([^\n]+)/i);
+  const notesTimeMatch = plainAll.match(/Время\.?\s*([^\n]+)/i);
+  const notesAttemptsDigitsMatch = plainAll.match(/(\d+)\s+попыт/i);
+  const notesAttemptsWordsMatch = plainAll.match(/(одна|две|три|четыре|пять)\s+попыт/i);
+  const attemptsWordMap = {
+    одна: '1',
+    две: '2',
+    три: '3',
+    четыре: '4',
+    пять: '5'
+  };
+
+  if (notesPassMatch && !result.passThreshold) {
+    result.passThreshold = cleanText(notesPassMatch[1]);
+  }
+
+  if (notesTimeMatch && !result.estimatedTime) {
+    result.estimatedTime = cleanText(notesTimeMatch[1]);
+  }
+
+  if (notesAttemptsDigitsMatch && !result.attemptsAllowed) {
+    result.attemptsAllowed = cleanText(notesAttemptsDigitsMatch[1]);
+  }
+
+  if (notesAttemptsWordsMatch && !result.attemptsAllowed) {
+    result.attemptsAllowed = attemptsWordMap[notesAttemptsWordsMatch[1].toLowerCase()] || '';
+  }
+
   return result;
 };
 
@@ -815,6 +844,26 @@ const parseTest = (moduleConfig, markdown) => {
   const questionBlocks = extractQuestionBlocks(markdown);
   const questions = questionBlocks.map(parseQuestion);
   const topMeta = parseTopMeta(markdown, questions.length);
+  const plainMarkdown = stripMarkdown(markdown);
+  const attemptsWordMap = {
+    одна: '1',
+    две: '2',
+    три: '3',
+    четыре: '4',
+    пять: '5'
+  };
+  const sanitizePassThreshold = (value) =>
+    cleanText(value).split('. ')[0].replace(/[.]+$/g, '').trim();
+  const rawPassThreshold = cleanText(plainMarkdown.match(/Проходн(?:ой уровень|ой балл)\.?\s*([^\n]+)/i)?.[1] || '');
+  const fallbackPassThreshold =
+    sanitizePassThreshold(topMeta.passThreshold) || sanitizePassThreshold(rawPassThreshold);
+  const fallbackEstimatedTime =
+    topMeta.estimatedTime || cleanText(plainMarkdown.match(/Время\.?\s*([^\n]+)/i)?.[1] || '').replace(/[.]+$/g, '').trim();
+  const fallbackAttemptsAllowed =
+    topMeta.attemptsAllowed ||
+    cleanText(plainMarkdown.match(/(\d+)\s+попыт/i)?.[1] || '') ||
+    attemptsWordMap[plainMarkdown.match(/(одна|две|три|четыре|пять)\s+попыт/i)?.[1]?.toLowerCase() || ''] ||
+    '';
 
   return {
     id: moduleConfig.id,
@@ -823,10 +872,10 @@ const parseTest = (moduleConfig, markdown) => {
     testTitle: rawHeading,
     sourceFile: moduleConfig.testFile,
     totalQuestions: topMeta.totalQuestions,
-    estimatedTime: topMeta.estimatedTime,
-    passThreshold: topMeta.passThreshold,
-    passThresholdValue: parsePassThresholdValue(topMeta.passThreshold, questions.length),
-    attemptsAllowed: topMeta.attemptsAllowed,
+    estimatedTime: fallbackEstimatedTime,
+    passThreshold: fallbackPassThreshold,
+    passThresholdValue: parsePassThresholdValue(fallbackPassThreshold, questions.length),
+    attemptsAllowed: fallbackAttemptsAllowed,
     questions
   };
 };
