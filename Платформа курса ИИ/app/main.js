@@ -295,6 +295,50 @@ const parseAnswerMap = (raw) => {
   return result;
 };
 
+const normalizeMatchingExpectedMap = (rawExpected) => {
+  const expected = normalizeAnswerMapObject(rawExpected || {});
+  const extractGroupedMembers = (value) => {
+    const members = String(value || '')
+      .split(/[\s,;|]+/)
+      .map((item) => item.replace(/[.,]+$/g, '').trim())
+      .filter(Boolean);
+
+    if (members.length < 2) {
+      return [];
+    }
+
+    const normalizedMembers = members.map((item) => {
+      if (/^\d+$/.test(item)) {
+        return item;
+      }
+
+      const choiceKey = normalizeChoiceKey(item);
+      return /^[A-ZА-ЯЁ]$/i.test(choiceKey) ? choiceKey : '';
+    });
+
+    return normalizedMembers.every(Boolean) ? normalizedMembers : [];
+  };
+
+  const expanded = {};
+  let expandedAny = false;
+
+  for (const [key, value] of Object.entries(expected)) {
+    const groupedMembers = extractGroupedMembers(value);
+    if (groupedMembers.length >= 2) {
+      const normalizedCategory = normalizeComparableText(key);
+      groupedMembers.forEach((member) => {
+        expanded[member] = normalizedCategory;
+      });
+      expandedAny = true;
+      continue;
+    }
+
+    expanded[key] = value;
+  }
+
+  return expandedAny ? expanded : expected;
+};
+
 const countMapMatches = (expected, actual) =>
   Object.keys(expected).reduce((total, key) => (String(expected[key]) === String(actual[key]) ? total + 1 : total), 0);
 
@@ -366,7 +410,7 @@ const gradeQuestion = (question, rawAnswer) => {
 
   if (grading.mode === 'matching_text') {
     const actual = parseAnswerMap(rawAnswer || '');
-    const expected = grading.expectedMap || {};
+    const expected = normalizeMatchingExpectedMap(grading.expectedMap || {});
     const matchedPairs = countMapMatches(expected, actual);
     const totalPairs = Object.keys(expected).length;
     const requiredPairs = Number(grading.minCorrect || totalPairs || 0);
@@ -563,11 +607,17 @@ const orderingHint = (question) =>
   `Назначьте каждому пункту позицию от 1 до ${question.ordering?.items?.length || 0}. Одинаковые позиции использовать нельзя.`;
 
 const matchingHint = (question) => {
-  const expectedMap = question.grading?.expectedMap || {};
+  const expectedMap = normalizeMatchingExpectedMap(question.grading?.expectedMap || {});
   const values = Object.values(expectedMap);
   const allShort = values.every((value) => String(value).length <= 2);
   const requiredPairs = Number(question.grading?.minCorrect || Object.keys(expectedMap).length || 0);
   const totalPairs = Object.keys(expectedMap).length;
+
+  if (isCategorizedMatchingQuestion(question)) {
+    return totalPairs && requiredPairs < totalPairs
+      ? `Выберите категорию для каждого пункта. Нужно совпасть минимум по ${requiredPairs} из ${totalPairs}.`
+      : 'Выберите категорию для каждого пункта.';
+  }
 
   if (allShort && Object.keys(expectedMap).length > 0) {
     const sample = Object.entries(expectedMap)
@@ -653,7 +703,91 @@ const getStructuredMatchingData = (question) => {
   };
 };
 
+const extractCategoryDefinitions = (markdown) =>
+  String(markdown || '')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trim().replace(/^[-*]\s+/, ''))
+    .filter(Boolean)
+    .map((line) => line.match(/^(.+?)\s*(?:→|=>|->|=|:)\s*(.+)$/))
+    .filter(Boolean)
+    .map((match) => {
+      const label = stripMarkdown(match[1]).trim();
+      const rawMembers = String(match[2] || '')
+        .split(/[\s,;|]+/)
+        .map((item) => item.replace(/[.,]+$/g, '').trim())
+        .filter(Boolean);
+      const simpleMembers = rawMembers.filter((item) => /^\d+$/.test(item) || /^[A-Za-zА-Яа-яЁё]$/.test(item));
+
+      return simpleMembers.length >= 2
+        ? { key: normalizeComparableText(label), label }
+        : null;
+    })
+    .filter(Boolean);
+
+const getCategorizedMatchingData = (question) => {
+  const sections = parseMarkdownSections(question.promptMarkdown);
+  const items =
+    Object.values(sections)
+      .map((value) => extractKeyedItems(value))
+      .find((sectionItems) => sectionItems.length > 0 && sectionItems.every((item) => item.kind === 'numeric')) || [];
+  const categories = extractCategoryDefinitions(question.correctAnswer);
+
+  if (items.length === 0 || categories.length < 2) {
+    return null;
+  }
+
+  return { items, categories };
+};
+
+const isCategorizedMatchingQuestion = (question) => Boolean(getCategorizedMatchingData(question));
+
 const renderMatchingInput = (question, answer, disabled) => {
+  const categoryLayout = getCategorizedMatchingData(question);
+  if (categoryLayout) {
+    const current = parseAnswerMap(answer);
+
+    return `
+      <div class="muted">${matchingHint(question)}</div>
+      <div class="category-match-list">
+        ${categoryLayout.items
+          .map((item) => {
+            const selectedValue = String(current[item.key] || '');
+            return `
+              <div class="category-match-card">
+                <div class="category-match-text">
+                  <span class="matching-left-key">${escapeHtml(item.key)}</span>
+                  <span>${escapeHtml(item.label)}</span>
+                </div>
+                <div class="category-match-actions">
+                  ${categoryLayout.categories
+                    .map(
+                      (category) => `
+                        <label class="category-choice ${selectedValue === category.key ? 'active' : ''}">
+                          <input
+                            type="radio"
+                            name="match-category-${question.number}-${item.key}"
+                            data-question="${question.number}"
+                            data-input-type="matching-category"
+                            data-match-key="${escapeHtml(item.key)}"
+                            value="${escapeHtml(category.key)}"
+                            ${selectedValue === category.key ? 'checked' : ''}
+                            ${disabled ? 'disabled' : ''}
+                          />
+                          <span>${escapeHtml(category.label)}</span>
+                        </label>
+                      `
+                    )
+                    .join('')}
+                </div>
+              </div>
+            `;
+          })
+          .join('')}
+      </div>
+    `;
+  }
+
   const layout = getStructuredMatchingData(question);
   if (!layout) {
     return `
@@ -1162,6 +1296,22 @@ mainEl.addEventListener('change', (event) => {
 
     if (target.value) {
       current[matchKey] = target.value;
+    } else {
+      delete current[matchKey];
+    }
+
+    moduleState.answers[question] = current;
+    saveState();
+    return;
+  }
+
+  if (target.matches('[data-input-type="matching-category"]')) {
+    const question = Number(target.dataset.question);
+    const current = parseAnswerMap(moduleState.answers[question]);
+    const matchKey = String(target.dataset.matchKey || '');
+
+    if (target.value) {
+      current[matchKey] = normalizeComparableText(target.value);
     } else {
       delete current[matchKey];
     }

@@ -649,7 +649,46 @@ const parseExpectedMap = (text) => {
     }
   }
 
-  return expected;
+  const extractGroupedMembers = (value) => {
+    const members = cleanText(value)
+      .split(/[\s,;|]+/)
+      .map((item) => item.replace(/[.,]+$/g, '').trim())
+      .filter(Boolean);
+
+    if (members.length < 2) {
+      return [];
+    }
+
+    const normalizedMembers = members.map((item) => {
+      if (/^\d+$/.test(item)) {
+        return item;
+      }
+
+      const choiceKey = normalizeChoiceKey(item);
+      return /^[A-ZА-ЯЁ]$/i.test(choiceKey) ? choiceKey : '';
+    });
+
+    return normalizedMembers.every(Boolean) ? normalizedMembers : [];
+  };
+
+  const expanded = {};
+  let expandedAny = false;
+
+  for (const [key, value] of Object.entries(expected)) {
+    const groupedMembers = extractGroupedMembers(value);
+    if (groupedMembers.length >= 2) {
+      const normalizedCategory = normalizeComparableText(key);
+      groupedMembers.forEach((member) => {
+        expanded[member] = normalizedCategory;
+      });
+      expandedAny = true;
+      continue;
+    }
+
+    expanded[key] = value;
+  }
+
+  return expandedAny ? expanded : expected;
 };
 
 const parseOrderingData = (sections) => {
