@@ -342,6 +342,18 @@ const normalizeMatchingExpectedMap = (rawExpected) => {
 const countMapMatches = (expected, actual) =>
   Object.keys(expected).reduce((total, key) => (String(expected[key]) === String(actual[key]) ? total + 1 : total), 0);
 
+const invertMap = (source) => {
+  const inverted = {};
+
+  for (const [key, value] of Object.entries(source || {})) {
+    if (value && !(value in inverted)) {
+      inverted[value] = key;
+    }
+  }
+
+  return inverted;
+};
+
 const mapsEqual = (left, right) => {
   const leftKeys = Object.keys(left).sort();
   const rightKeys = Object.keys(right).sort();
@@ -411,7 +423,9 @@ const gradeQuestion = (question, rawAnswer) => {
   if (grading.mode === 'matching_text') {
     const actual = parseAnswerMap(rawAnswer || '');
     const expected = normalizeMatchingExpectedMap(grading.expectedMap || {});
-    const matchedPairs = countMapMatches(expected, actual);
+    const directMatches = countMapMatches(expected, actual);
+    const invertedMatches = countMapMatches(expected, invertMap(actual));
+    const matchedPairs = Math.max(directMatches, invertedMatches);
     const totalPairs = Object.keys(expected).length;
     const requiredPairs = Number(grading.minCorrect || totalPairs || 0);
     const correct = matchedPairs >= requiredPairs && totalPairs > 0;
