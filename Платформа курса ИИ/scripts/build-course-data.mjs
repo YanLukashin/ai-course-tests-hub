@@ -159,7 +159,7 @@ const parseOptions = (markdown) => {
     raw = raw.replace(/^\[[ xX]\]\s*/, '').trim();
     raw = raw.replace(/\*\*/g, '');
 
-    const match = raw.match(/^[\s\[{(]*([A-Za-zА-Яа-яЁё])[\s)\].}]?\s*[-—–:]?\s*(.+)$/);
+    const match = raw.match(/^[\s\[{(]*([A-Za-zА-Яа-яЁё])[)\].}]\s*[-—–:]?\s*(.+)$/);
     if (!match) {
       continue;
     }
@@ -171,6 +171,53 @@ const parseOptions = (markdown) => {
   }
 
   return options;
+};
+
+const extractInlineOptions = (markdown) => {
+  const lines = String(markdown || '').replace(/\r/g, '').split('\n');
+  let startIndex = -1;
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].trim();
+
+    if (!line) {
+      continue;
+    }
+
+    if (startIndex !== -1 && /^>\s?/.test(line)) {
+      break;
+    }
+
+    if (startIndex !== -1 && /^(?:\*\*|###\s+)/.test(line)) {
+      break;
+    }
+
+    if (startIndex !== -1 && !parseOptions(line).length) {
+      break;
+    }
+
+    const optionLike = parseOptions(line);
+    if (optionLike.length === 1) {
+      startIndex = index;
+      continue;
+    }
+  }
+
+  if (startIndex === -1) {
+    return null;
+  }
+
+  const optionBlock = lines.slice(startIndex).join('\n').trim();
+  const options = parseOptions(optionBlock);
+
+  if (options.length < 2) {
+    return null;
+  }
+
+  return {
+    content: lines.slice(0, startIndex).join('\n').trim(),
+    options
+  };
 };
 
 const parseTableBlock = (markdown) => {
@@ -777,7 +824,7 @@ const buildGrading = (question) => {
 
 const parseQuestion = (entry) => {
   const metadata = parseQuestionMetadata(entry.markdown);
-  const sections = parseSections(entry.markdown);
+  const sections = { ...parseSections(entry.markdown) };
 
   const optionsSectionName = findSectionName(sections, (key) => key === 'варианты ответов');
   const correctSectionName = findSectionName(
@@ -795,7 +842,32 @@ const parseQuestion = (entry) => {
   );
   const hiddenPromptKeys = new Set();
 
-  const options = optionsSectionName ? parseOptions(sections[optionsSectionName]) : [];
+  let options = optionsSectionName ? parseOptions(sections[optionsSectionName]) : [];
+
+  if (options.length === 0) {
+    const prioritizedSectionNames = Object.keys(sections).filter((sectionName) => {
+      const normalizedKey = normalizeComparableText(sectionName);
+      if (
+        normalizedKey === '__intro__' ||
+        normalizedKey.startsWith('правильн') ||
+        normalizedKey === 'пояснение' ||
+        normalizedKey.startsWith('почему')
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    for (const sectionName of prioritizedSectionNames) {
+      const extractedInlineOptions = extractInlineOptions(sections[sectionName]);
+      if (extractedInlineOptions) {
+        options = extractedInlineOptions.options;
+        sections[sectionName] = extractedInlineOptions.content;
+        break;
+      }
+    }
+  }
   const interaction = detectInteraction(metadata.type, options);
   const ordering = interaction === 'ordering' ? parseOrderingData(sections) : null;
   let correctAnswer = correctSectionName ? sections[correctSectionName] : '';
@@ -855,7 +927,14 @@ const parseQuestion = (entry) => {
     }
   }
 
-  const promptMarkdown = buildPromptMarkdown(sections, interaction, hiddenPromptKeys);
+  let promptMarkdown = buildPromptMarkdown(sections, interaction, hiddenPromptKeys);
+  if (options.length === 0 && (interaction === 'single_choice' || interaction === 'multi_choice')) {
+    const extractedInlineOptions = extractInlineOptions(promptMarkdown);
+    if (extractedInlineOptions) {
+      options = extractedInlineOptions.options;
+      promptMarkdown = extractedInlineOptions.content;
+    }
+  }
   const explanation = explanationSectionName ? sections[explanationSectionName] : '';
 
   const question = {
