@@ -670,6 +670,97 @@ const parseMarkdownSections = (markdown) => {
   );
 };
 
+const parseInlineChoiceOptions = (markdown) => {
+  const options = [];
+
+  for (const line of String(markdown || '').replace(/\r/g, '').split('\n')) {
+    let raw = line.trim();
+    if (!raw) {
+      continue;
+    }
+
+    raw = raw.replace(/^[☐☑■□▪◻◼]\s*/, '').trim();
+    raw = raw.replace(/^[-*]\s+/, '').trim();
+    raw = raw.replace(/^\[[ xX]\]\s*/, '').trim();
+    raw = raw.replace(/\*\*/g, '');
+
+    const match = raw.match(/^[\s\[{(]*([A-Za-zА-Яа-яЁё])[)\].}]\s*[-—–:]?\s*(.+)$/);
+    if (!match) {
+      continue;
+    }
+
+    options.push({
+      key: normalizeChoiceKey(match[1]),
+      label: String(match[2] || '').trim()
+    });
+  }
+
+  return options;
+};
+
+const extractInlineChoiceOptions = (markdown) => {
+  const lines = String(markdown || '').replace(/\r/g, '').split('\n');
+  let startIndex = -1;
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index].trim();
+
+    if (!line) {
+      continue;
+    }
+
+    if (startIndex !== -1 && /^>\s?/.test(line)) {
+      break;
+    }
+
+    if (startIndex !== -1 && /^(?:\*\*|###\s+)/.test(line)) {
+      break;
+    }
+
+    if (startIndex !== -1 && parseInlineChoiceOptions(line).length === 0) {
+      break;
+    }
+
+    if (parseInlineChoiceOptions(line).length === 1) {
+      startIndex = index;
+    }
+  }
+
+  if (startIndex === -1) {
+    return null;
+  }
+
+  const optionBlock = lines.slice(startIndex).join('\n').trim();
+  const options = parseInlineChoiceOptions(optionBlock);
+  if (options.length < 2) {
+    return null;
+  }
+
+  return {
+    promptMarkdown: lines.slice(0, startIndex).join('\n').trim(),
+    options
+  };
+};
+
+const getResolvedChoiceData = (question) => {
+  if (Array.isArray(question.options) && question.options.length > 0) {
+    return {
+      promptMarkdown: question.promptMarkdown,
+      options: question.options
+    };
+  }
+
+  if (question.interaction !== 'single_choice' && question.interaction !== 'multi_choice') {
+    return {
+      promptMarkdown: question.promptMarkdown,
+      options: question.options || []
+    };
+  }
+
+  const extracted = extractInlineChoiceOptions(question.promptMarkdown);
+  return extracted || { promptMarkdown: question.promptMarkdown, options: question.options || [] };
+};
+
 const extractKeyedItems = (markdown) => {
   const lines = String(markdown || '')
     .replace(/\r/g, '')
@@ -897,7 +988,9 @@ const renderOrderingInput = (question, answer, disabled) => {
 
 const renderQuestionInput = (question, answer, submitted) => {
   if (question.interaction === 'single_choice') {
-    return question.options
+    const { options } = getResolvedChoiceData(question);
+
+    return options
       .map(
         (option) => `
           <label class="option-item">
@@ -918,9 +1011,10 @@ const renderQuestionInput = (question, answer, submitted) => {
   }
 
   if (question.interaction === 'multi_choice') {
+    const { options } = getResolvedChoiceData(question);
     const selected = Array.isArray(answer) ? answer : [];
 
-    return question.options
+    return options
       .map(
         (option) => `
           <label class="option-item">
@@ -1035,6 +1129,7 @@ const renderModuleTest = () => {
       ${module.questions
         .map((question) => {
           const answer = moduleState.answers[question.number];
+          const { promptMarkdown } = getResolvedChoiceData(question);
           return `
             <article class="question-card">
               <div class="question-top">
@@ -1043,7 +1138,7 @@ const renderModuleTest = () => {
                 <span class="badge">${escapeHtml(question.difficulty || '—')}</span>
               </div>
 
-              <div class="markdown">${markdownToHtml(question.promptMarkdown)}</div>
+              <div class="markdown">${markdownToHtml(promptMarkdown)}</div>
 
               <div class="field-block">
                 ${renderQuestionInput(question, answer, submitted)}

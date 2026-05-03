@@ -156,6 +156,7 @@ const parseOptions = (markdown) => {
       raw = raw.replace(/^[-*]\s+/, '').trim();
     }
 
+    raw = raw.replace(/^[☐☑■□▪◻◼]\s*/, '').trim();
     raw = raw.replace(/^\[[ xX]\]\s*/, '').trim();
     raw = raw.replace(/\*\*/g, '');
 
