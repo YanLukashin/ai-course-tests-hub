@@ -795,8 +795,16 @@ const getStructuredMatchingData = (question) => {
 
   const leftItems =
     sectionItems.find((items) => items.every((item) => item.kind === 'numeric')) || [];
-  const rightItems =
+  const rightItemsFromPrompt =
     sectionItems.find((items) => items.every((item) => item.kind === 'choice')) || [];
+  const rightItemsFromOptions = Array.isArray(question.options)
+    ? question.options.map((option) => ({
+        key: normalizeChoiceKey(option.key),
+        label: String(option.label || '').trim(),
+        kind: 'choice'
+      }))
+    : [];
+  const rightItems = rightItemsFromPrompt.length > 0 ? rightItemsFromPrompt : rightItemsFromOptions;
 
   if (leftItems.length === 0 || rightItems.length === 0) {
     return null;

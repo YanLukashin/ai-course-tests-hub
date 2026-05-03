@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-03T10:44:39.131Z",
+  "generatedAt": "2026-05-03T10:51:10.694Z",
   "siteTitle": "Межмодульное тестирование",
   "courseTitle": "ИИ для предпринимателей и специалистов",
   "modules": [
@@ -851,7 +851,7 @@
               "4": "D",
               "5": "E"
             },
-            "minCorrect": 5
+            "minCorrect": 4
           }
         },
         {
@@ -931,7 +931,7 @@
               "3": "C",
               "4": "D"
             },
-            "minCorrect": 4
+            "minCorrect": 3
           }
         },
         {
@@ -1155,7 +1155,7 @@
               "3": "C",
               "4": "D"
             },
-            "minCorrect": 4
+            "minCorrect": 3
           }
         },
         {
@@ -1195,7 +1195,7 @@
               "2": "B",
               "3": "C"
             },
-            "minCorrect": 3
+            "minCorrect": 2
           }
         }
       ]
@@ -1282,7 +1282,7 @@
             "expectedMap": {
               "c time": "to hire"
             },
-            "minCorrect": 1
+            "minCorrect": 3
           }
         },
         {
@@ -1355,7 +1355,7 @@
               "3 short": "list кандидатов",
               "b human": "approve"
             },
-            "minCorrect": 5
+            "minCorrect": 3
           }
         },
         {
@@ -1411,7 +1411,7 @@
             "expectedMap": {
               "semi": "auto pipeline"
             },
-            "minCorrect": 1
+            "minCorrect": 3
           }
         },
         {
@@ -2061,7 +2061,7 @@
             "expectedMap": {
               "5 supervised multi": "step workflow"
             },
-            "minCorrect": 1
+            "minCorrect": 4
           }
         },
         {
@@ -2185,7 +2185,7 @@
             "expectedMap": {
               "высокая цена ошибки без human": "in the loop"
             },
-            "minCorrect": 1
+            "minCorrect": 2
           }
         },
         {

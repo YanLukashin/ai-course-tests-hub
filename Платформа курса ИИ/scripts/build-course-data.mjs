@@ -372,6 +372,22 @@ const parseMatchingThreshold = (text, totalPairs) => {
     return Number.parseInt(exactMatch[1], 10) || totalPairs;
   }
 
+  const gteMatch = raw.match(/[≥>=]+\s*(\d+)\s*из\s*(\d+)/i);
+  if (gteMatch) {
+    return Number.parseInt(gteMatch[1], 10) || totalPairs;
+  }
+
+  const fractionMatches = [...raw.matchAll(/(\d+)\s*\/\s*(\d+)/g)];
+  if (fractionMatches.length > 0) {
+    const candidates = fractionMatches
+      .map((match) => Number.parseInt(match[1], 10))
+      .filter((value) => Number.isFinite(value));
+
+    if (candidates.length > 0) {
+      return Math.min(...candidates) || totalPairs;
+    }
+  }
+
   const fallbackMatch = raw.match(/минимум\s+(\d+)/i);
   if (fallbackMatch) {
     return Number.parseInt(fallbackMatch[1], 10) || totalPairs;
