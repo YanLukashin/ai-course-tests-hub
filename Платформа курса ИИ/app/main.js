@@ -1,7 +1,7 @@
 const DATA_URL = './data/course-data.json';
 const STORAGE_KEY = 'ai-course-tests-v2';
 const MOBILE_BREAKPOINT = 1100;
-const AVAILABLE_MODULE_IDS = new Set(['module-1', 'module-2']);
+const AVAILABLE_MODULE_IDS = new Set(['module-1', 'module-2', 'module-3']);
 const DISPLAY_MODULES = [
   { number: 1, id: 'module-1', title: 'Ландшафт ИИ для бизнеса' },
   { number: 2, id: 'module-2', title: 'Выбор ИИ-модели под задачу' },
@@ -578,8 +578,8 @@ const renderHub = () => {
       </div>
 
       <div class="panel">
-        <strong>Сейчас доступны модули 1 и 2.</strong>
-        <p class="muted">Модули 3–9 временно закрыты, пока вы перепроверяете вопросы и парсер.</p>
+        <strong>Сейчас доступны модули 1, 2 и 3.</strong>
+        <p class="muted">Модули 4–9 временно закрыты, пока вы перепроверяете вопросы и парсер.</p>
       </div>
 
       <div class="module-grid">
