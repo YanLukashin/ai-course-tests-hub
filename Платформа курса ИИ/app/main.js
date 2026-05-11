@@ -1,4 +1,5 @@
-const DATA_URL = './data/course-data.json';
+const APP_VERSION = '2026-05-11-1';
+const DATA_URL = `./data/course-data.json?v=${APP_VERSION}`;
 const STORAGE_KEY = 'ai-course-tests-v2';
 const MOBILE_BREAKPOINT = 1100;
 const AVAILABLE_MODULE_IDS = new Set(['module-1', 'module-2', 'module-3', 'module-4']);
