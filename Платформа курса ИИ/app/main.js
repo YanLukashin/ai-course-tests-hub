@@ -2,7 +2,7 @@ const APP_VERSION = '2026-05-11-1';
 const DATA_URL = `./data/course-data.json?v=${APP_VERSION}`;
 const STORAGE_KEY = 'ai-course-tests-v2';
 const MOBILE_BREAKPOINT = 1100;
-const AVAILABLE_MODULE_IDS = new Set(['module-1', 'module-2', 'module-3', 'module-4']);
+const AVAILABLE_MODULE_IDS = new Set(['module-1', 'module-2', 'module-3', 'module-4', 'module-5']);
 const DISPLAY_MODULES = [
   { number: 1, id: 'module-1', title: 'Ландшафт ИИ для бизнеса' },
   { number: 2, id: 'module-2', title: 'Выбор ИИ-модели под задачу' },
@@ -579,7 +579,7 @@ const renderHub = () => {
       </div>
 
       <div class="panel">
-        <strong>Сейчас доступны модули 1, 2, 3 и 4.</strong>
+        <strong>Сейчас доступны модули 1, 2, 3, 4 и 5.</strong>
         <p class="muted">Модули 5–9 временно закрыты, пока вы перепроверяете вопросы и парсер.</p>
       </div>
 
