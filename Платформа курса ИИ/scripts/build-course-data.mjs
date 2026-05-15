@@ -724,6 +724,7 @@ const parseExpectedMap = (text) => {
   const fragments = lines
     .filter((line) => !line.startsWith('|'))
     .flatMap((line) => line.split(';'))
+    .flatMap((line) => line.split('|'))
     .map((line) => line.trim())
     .filter(Boolean);
 
