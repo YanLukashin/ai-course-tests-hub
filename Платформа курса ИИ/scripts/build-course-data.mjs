@@ -114,6 +114,16 @@ const extractChoiceTokens = (text) => {
 
 const parseMapToken = (value) => {
   const cleaned = cleanText(value);
+  const leadingNumeric = cleaned.match(/^(\d+)\b/);
+  if (leadingNumeric) {
+    return leadingNumeric[1];
+  }
+
+  const leadingChoice = cleaned.match(/^[([{\s]*([A-Za-zА-Яа-яЁё])(?:[\])}.:;,\s-]|$)/);
+  if (leadingChoice) {
+    return normalizeChoiceKey(leadingChoice[1]);
+  }
+
   const numeric = cleaned.match(/\d+/)?.[0];
   if (numeric && /^\d+$/.test(cleaned.replace(/[().\s-]/g, ''))) {
     return numeric;
@@ -680,10 +690,40 @@ const buildPromptMarkdown = (sections, interaction, hiddenKeys = new Set()) => {
 const parseExpectedMap = (text) => {
   const expected = {};
   const cleaned = cleanText(text);
-  const fragments = cleaned
+  const lines = cleaned
     .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const tableRows = parseTableBlock(cleaned);
+  for (const row of tableRows) {
+    if (row.length < 2) {
+      continue;
+    }
+
+    const leftToken = parseMapToken(row[0]);
+    const rightToken = parseMapToken(row[1]);
+
+    if (!leftToken || !rightToken) {
+      continue;
+    }
+
+    const rowLooksLikeHeader =
+      !/^\d+$/.test(String(leftToken)) &&
+      !/^[A-ZА-ЯЁ]$/i.test(String(leftToken)) &&
+      !/^\d+$/.test(String(rightToken)) &&
+      !/^[A-ZА-ЯЁ]$/i.test(String(rightToken));
+
+    if (rowLooksLikeHeader) {
+      continue;
+    }
+
+    expected[leftToken] = rightToken;
+  }
+
+  const fragments = lines
+    .filter((line) => !line.startsWith('|'))
     .flatMap((line) => line.split(';'))
-    .flatMap((line) => line.split('|'))
     .map((line) => line.trim())
     .filter(Boolean);
 
@@ -700,17 +740,6 @@ const parseExpectedMap = (text) => {
       continue;
     }
 
-    if (trimmed.startsWith('|')) {
-      const row = trimmed.replace(/^\||\|$/g, '').split('|').map((cell) => cleanText(cell));
-      if (row.length < 2 || /^:?-+:?$/.test(row[0])) {
-        continue;
-      }
-
-      const leftToken = parseMapToken(row[0]) || String(index + 1);
-      const rightToken = parseMapToken(row[1]);
-      expected[leftToken] = rightToken;
-      continue;
-    }
   }
 
   const extractGroupedMembers = (value) => {
