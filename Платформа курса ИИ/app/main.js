@@ -671,6 +671,21 @@ const parseMarkdownSections = (markdown) => {
   );
 };
 
+const parseMarkdownTableRows = (markdown) =>
+  String(markdown || '')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('|'))
+    .map((line) => line.replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim()))
+    .filter((row) => row.length >= 2);
+
+const stripChoiceLabelPrefix = (value) =>
+  String(value || '')
+    .trim()
+    .replace(/^(?:[([{]?\s*[A-Za-zА-Яа-яЁё][)\].}]|[A-Za-zА-Яа-яЁё]\s*[-—–:])\s*/u, '')
+    .trim();
+
 const parseInlineChoiceOptions = (markdown) => {
   const options = [];
 
@@ -772,10 +787,33 @@ const extractKeyedItems = (markdown) => {
   const items = [];
 
   for (const line of lines) {
+    if (line.startsWith('|')) {
+      const row = line.replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
+      if (row.length >= 2 && !row.every((cell) => /^:?-{2,}:?$/.test(cell) || !cell)) {
+        const numericKey = row[0].match(/^(\d+)\b/)?.[1];
+        if (numericKey && row[1]) {
+          items.push({ key: numericKey, label: stripMarkdown(row[1]).trim(), kind: 'numeric' });
+          continue;
+        }
+
+        const choiceKey = normalizeChoiceKey(row[0]);
+        if (/^[A-ZА-ЯЁ]$/i.test(choiceKey) && row[1]) {
+          items.push({ key: choiceKey, label: stripChoiceLabelPrefix(stripMarkdown(row[1])), kind: 'choice' });
+          continue;
+        }
+      }
+    }
+
     const cleaned = line.replace(/^[-*]\s+/, '').trim();
     const numericMatch = cleaned.match(/^(\d+)[.)]\s+(.+)$/);
     if (numericMatch) {
       items.push({ key: numericMatch[1], label: numericMatch[2].trim(), kind: 'numeric' });
+      continue;
+    }
+
+    const numberedTaskMatch = cleaned.replace(/\*\*/g, '').match(/^Задача\s+(\d+)\.?\s*(.+)$/iu);
+    if (numberedTaskMatch) {
+      items.push({ key: numberedTaskMatch[1], label: numberedTaskMatch[2].trim(), kind: 'numeric' });
       continue;
     }
 
@@ -786,6 +824,39 @@ const extractKeyedItems = (markdown) => {
   }
 
   return items;
+};
+
+const extractChoiceItemsFromCorrectAnswer = (markdown) => {
+  const rows = parseMarkdownTableRows(markdown);
+  const items = [];
+
+  for (const row of rows) {
+    if (row.length < 2 || row.every((cell) => /^:?-{2,}:?$/.test(cell) || !cell)) {
+      continue;
+    }
+
+    const leftKey = parseMapToken(row[0]);
+    if (!/^\d+$/.test(String(leftKey))) {
+      continue;
+    }
+
+    const rawLabel = stripMarkdown(row[1]).trim();
+    const rightKey = parseMapToken(rawLabel);
+    if (!rightKey || !rawLabel) {
+      continue;
+    }
+
+    items.push({
+      key: rightKey,
+      label: stripChoiceLabelPrefix(rawLabel),
+      kind: 'choice'
+    });
+  }
+
+  return unique(items.map((item) => `${item.key}::${item.label}`)).map((packed) => {
+    const [key, label] = packed.split('::');
+    return { key, label, kind: 'choice' };
+  });
 };
 
 const getStructuredMatchingData = (question) => {
@@ -805,7 +876,13 @@ const getStructuredMatchingData = (question) => {
         kind: 'choice'
       }))
     : [];
-  const rightItems = rightItemsFromPrompt.length > 0 ? rightItemsFromPrompt : rightItemsFromOptions;
+  const rightItemsFromCorrectAnswer = extractChoiceItemsFromCorrectAnswer(question.correctAnswer);
+  const rightItems =
+    rightItemsFromPrompt.length > 0
+      ? rightItemsFromPrompt
+      : rightItemsFromOptions.length > 0
+        ? rightItemsFromOptions
+        : rightItemsFromCorrectAnswer;
 
   if (leftItems.length === 0 || rightItems.length === 0) {
     return null;
