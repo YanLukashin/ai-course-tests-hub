@@ -916,13 +916,55 @@ const extractCategoryDefinitions = (markdown) =>
     })
     .filter(Boolean);
 
+const extractRepeatedExpectedCategories = (question) => {
+  const expectedMap = normalizeMatchingExpectedMap(question.grading?.expectedMap || {});
+  const counts = {};
+
+  for (const value of Object.values(expectedMap)) {
+    const key = String(value || '');
+    counts[key] = (counts[key] || 0) + 1;
+  }
+
+  const tableRows = parseMarkdownTableRows(question.correctAnswer);
+  const labelsByKey = {};
+  for (const row of tableRows) {
+    if (row.length < 2) {
+      continue;
+    }
+
+    const leftKey = parseMapToken(row[0]);
+    if (!/^\d+$/.test(String(leftKey))) {
+      continue;
+    }
+
+    const rawLabel = stripMarkdown(row[1]).trim();
+    const normalizedKey = parseMapToken(rawLabel);
+    if (!normalizedKey || labelsByKey[normalizedKey]) {
+      continue;
+    }
+
+    labelsByKey[normalizedKey] = stripChoiceLabelPrefix(rawLabel);
+  }
+
+  return unique(Object.values(expectedMap))
+    .filter((key) => counts[key] > 1)
+    .map((key) => ({
+      key,
+      label: labelsByKey[key] || String(key || '')
+    }));
+};
+
 const getCategorizedMatchingData = (question) => {
   const sections = parseMarkdownSections(question.promptMarkdown);
   const items =
     Object.values(sections)
       .map((value) => extractKeyedItems(value))
       .find((sectionItems) => sectionItems.length > 0 && sectionItems.every((item) => item.kind === 'numeric')) || [];
-  const categories = extractCategoryDefinitions(question.correctAnswer);
+  const derivedCategories = extractRepeatedExpectedCategories(question);
+  const categories =
+    derivedCategories.length >= 2 && derivedCategories.length < items.length
+      ? derivedCategories
+      : extractCategoryDefinitions(question.correctAnswer);
 
   if (items.length === 0 || categories.length < 2) {
     return null;
