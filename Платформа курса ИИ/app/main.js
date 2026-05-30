@@ -1,4 +1,4 @@
-const APP_VERSION = '2026-05-30-1';
+const APP_VERSION = '2026-05-30-2';
 const DATA_URL = `./data/course-data.json?v=${APP_VERSION}`;
 const STORAGE_KEY = 'ai-course-tests-v2';
 const MOBILE_BREAKPOINT = 1100;
