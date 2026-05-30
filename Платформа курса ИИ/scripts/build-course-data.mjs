@@ -40,6 +40,12 @@ const MODULES = [
     id: 'module-6',
     title: 'ИИ-агенты: где уместны, где избыточны',
     testFile: 'Модуль 6/Module-6-Test-Ready.md'
+  },
+  {
+    number: 7,
+    id: 'module-7',
+    title: 'Vibe coding и AI-прототипирование без команды разработки',
+    testFile: 'Модуль 7/Module-7-Test.md'
   }
 ];
 
