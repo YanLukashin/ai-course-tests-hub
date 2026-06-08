@@ -52,6 +52,12 @@ const MODULES = [
     id: 'module-8',
     title: 'Стратегия внедрения ИИ',
     testFile: 'Модуль 8/Test-Module-8.md'
+  },
+  {
+    number: 9,
+    id: 'module-9',
+    title: 'Право, этика и governance ИИ',
+    testFile: 'Модуль 9/Module-9-Test.md'
   }
 ];
 
