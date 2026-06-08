@@ -46,6 +46,12 @@ const MODULES = [
     id: 'module-7',
     title: 'Vibe coding и AI-прототипирование без команды разработки',
     testFile: 'Модуль 7/Module-7-Test.md'
+  },
+  {
+    number: 8,
+    id: 'module-8',
+    title: 'Стратегия внедрения ИИ',
+    testFile: 'Модуль 8/Test-Module-8.md'
   }
 ];
 
